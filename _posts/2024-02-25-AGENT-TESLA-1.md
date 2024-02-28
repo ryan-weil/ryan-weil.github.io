@@ -1,20 +1,24 @@
 ---
 layout: post
-title:  "Investigating Agent Tesla [Part 1]"
+title:  "Agent Tesla [Part 1: Unpacking]"
 date:   2024-02-27 16:46:24 +0200
 categories: malware
 ---
 
+## Introduction
+
+Agent Tesla is a popular info stealer coded in C# that consistently makes lists as one of the most prevalent malware strains. In this post we will be looking at a sample of Agent Tesla that has been packed by a very popular crypter. I am currently not aware of the name of the particular crypter responsible, but the amount of samples I am seeing daily being packed by it is insane. Despite this, I've only found 3 other articles documenting this crypter([here](https://avsw.ru/component/content/article/analiz-semejstva-troyanov-agent-tesla?catid=9:avsoft-blog&Itemid=140), [here](https://infosecwriteups.com/unfolding-remcos-rat-4-9-2-pro-dfb3cb25bbd1) and [here](https://osamaellahi.medium.com/unfolding-agent-tesla-the-art-of-credentials-harvesting-f1a988cfd137)), but they are not very detailed, especially in explaining how to unpack the malware. The goal of this post is to explain how to unpack the final payload, starting from the beginning.
+
 ## First Stage
 
-After extracting the original executable file `[MD5: B89F6062D174E452D189EC4248AF489C]`, we open it in popular .NET decompilation tool dnSpy. We right click the Assembly and select 'Go to Entry Point'. We take notice of the line 
+We begin by opening the initial file `[MD5:B89F6062D174E452D189EC4248AF489C]` in popular .NET decompilation tool dnSpy. We right click the assembly and select 'Go to Entry Point'. We take notice of the line 
 `Application.Run(new DangNhap());`. This creates a new instance of a Windows Form. We click on the `DangNhap` part to navigate to the class. There, we see `this.InitializeComponent();` in the constructor. Again, we click on `InitializeComponent` to go to its code. Looking at the top of the method, nothing seems immediately suspicious. However, as we scroll down more we see something peculiar:
 
 ![Alt text](/images/at1/image1.png)
 
-This code fetches a resource named `Lux3`. Next, it performs a decryption routine on the resource. Once the routine is done, it dynamically calls `Assembly.Load()` to load the newly decrypted module. After this, it gets the Type at index 9 in the Assembly, and the method at index 3 from the aforementioned type. It splits the class variable 'Discart' (defined as `private string Discart = "62657A54_626C66";`) by the underscore delimeter and invokes the method passing both halves of the delimeted string and the string "Sync_Center".
+This code fetches a resource named `Lux3`. Next, it performs a decryption routine on the resource. Once the routine is done, it dynamically calls `Assembly.Load()` to load the newly decrypted module. After this, it gets the Type at index 9 in the assembly, and the method at index 3 from the aforementioned type. It splits the class variable 'Discart' (defined as `private string Discart = "62657A54_626C66";`) by the underscore delimeter and invokes the method passing both halves of the delimeted string and the string "Sync_Center".
 
-We need to debug the code and follow execution into the this new Assembly. To do this, we will place a breakpoint on the line here by clicking to the left of it by the line number. We will then begin debugging by clicking the `Start` button at the top of the window.
+We need to debug the code and follow execution into the new assembly. To do this, we will place a breakpoint on the line here by clicking to the left of it by the line number. We will then begin debugging by clicking the `Start` button at the top of the window.
 
 ![Alt text](/images/at1/image.png)
 
@@ -32,9 +36,9 @@ Double clicking on the `DeclareTextBoxValue` assembly will open the assembly in-
 
 ![Alt text](/images/at1/image-3.png)
 
-## Second/Third Stage (*)
+## Second/Third Stage
 
-Upon arriving at the method in the second stage, it is immediately clear that it is much too obfuscated to read. We will need to deobfuscate the assembly. Let's try saving/dumping this new Assembly so we have access on the disk to it. Right click the `DeclareTextBoxValue` module in the Modules pane and save it to the disk.
+Upon arriving at the method in the second stage, it is immediately clear that it is much too obfuscated to read. We will need to deobfuscate the assembly. Let's try saving/dumping this new assembly so we have access on the disk to it. Right click the `DeclareTextBoxValue` module in the Modules pane and save it to the disk.
 
 We will attempt to use popular .NET deobfuscation tool de4dot and hope that this takes care of the obfuscation.
 
@@ -48,11 +52,11 @@ This is MUCH more readable. Let's break down what is going on here. Firstly, we 
 
 ![alt text](/images/at1/image-6.png)
 
-Following this, the array is decompressed to an Assembly. `QuickSort.smethod_4` is called which is simply a wrapper for Assembly.Load(). The type `ReactionDiffusionLib.ReactionVessel` is then extracted.
+Following this, the array is decompressed to an assembly. `QuickSort.smethod_4` is called which is simply a wrapper for Assembly.Load(). The type `ReactionDiffusionLib.ReactionVessel` is then extracted.
 
-An instance is created of the type, and the method `CasualitySource` is invoked twice. In order to see what this method is actually doing, we're going to need to continue our debugging and get into that Assembly. 
+An instance is created of the type, and the method `CasualitySource` is invoked twice. In order to see what this method is actually doing, we're going to need to continue our debugging and get into that assembly. 
 
-In order to do this, we will go back to the original obfuscated Assembly in dnSpy that is currently loaded in memory. Since the code is obfuscated, it will be difficult to find the call to `Assembly.Load()`. What we will do instead is go into the library itself and put a breakpoint on every overload of `Assembly.Load()`.
+In order to do this, we will go back to the original obfuscated assembly in dnSpy that is currently loaded in memory. Since the code is obfuscated, it will be difficult to find the call to `Assembly.Load()`. What we will do instead is go into the library itself and put a breakpoint on every overload of `Assembly.Load()`.
 
 ![alt text](/images/at1/image-8.png)
 
@@ -68,7 +72,7 @@ Nice, it hit one of our breakpoints. Let's step through and see what was loaded.
 
 ![alt text](/images/at1/image-12.png)
 
-This Assembly that was loaded here with the odd symbol as the name is actually part of DeepSea Obfuscator's resource encryption. In the screenshot of the decompiled output of DLL that de4dot cleaned, it decrypted the resource and removed that portion of the code. Thus, we can simply continue on to the next `Assembly.Load()` which should be the same as the first one in the de4dot-cleaned DLL (called on line 23).
+This assembly that was loaded here with the odd symbol as the name is actually part of DeepSea Obfuscator's resource encryption. In the screenshot of the decompiled output of DLL that de4dot cleaned, it decrypted the resource and removed that portion of the code. Thus, we can simply continue on to the next `Assembly.Load()` which should be the same as the first one in the de4dot-cleaned DLL (called on line 23).
 
 ![alt text](/images/at1/image-13.png)
 
@@ -210,7 +214,7 @@ There is a final check which determines the execution type (Reflection or Proces
 
 ![alt text](/images/at1/image-55.png)
 
-At this point, the injection type used is irrelevant (although if you are curious in this case it does use process hollowing). Since the payloaad has already been decrypted, we can simply dump that byte array `fjjMqxMfW1UDxAHtaE.obLq1XEEqU` from the `static fields` pane in dnSpy.
+At this point, the injection type used is irrelevant (although if you are curious in this case it does use process hollowing). Since the payload has already been decrypted, we can simply dump that byte array `fjjMqxMfW1UDxAHtaE.obLq1XEEqU` from the `static fields` pane in dnSpy.
 
 Opening the dumped file in dnSpy confirms that it is indeed Agent Tesla
 
