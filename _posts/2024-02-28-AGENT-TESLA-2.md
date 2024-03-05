@@ -10,16 +10,19 @@ categories: malware
 In the [previous post](https://ryan-weil.github.io/posts/AGENT-TESLA-1/), we successfully unpacked Agent Tesla. We left off on a bit of a cliffhanger though, because after opening it in dnSpy it was apparent that it had control flow flattening applied. At first glance it doesn't look too unreadable:
 
 ![alt text](/images/at2/first.png)
+_Figure 1_
 
 But if we continue looking around other functions, we can see it gets ridiculous. Take a look at this one `zg5QIGkJ` for example:
 
 ![alt text](/images/at2/flattened.gif)
+_Figure 2_
 
 This took me 20 seconds to scroll from the top of the function to the bottom because it contains a whopping 800 lines of code!
 
 How many lines of code do you think the function had originally before the flattening was applied? I'll give you a little sneak peak of what our finished product will look like:
 
 ![alt text](/images/at2/unflattened.gif)
+_Figure 3_
 
 That's right, only 200 lines of code. The flattening made the code roughly 4x larger than it was before and more or less completely eliminated any readbility. Unless you want to spend 500 years debugging such vomit, we're going need to find a way to deobfuscate this.
 
@@ -28,8 +31,10 @@ That's right, only 200 lines of code. The flattening made the code roughly 4x la
 First, let's try throwing Agent Tesla into de4dot and see if it removes the control flow like it did for the assemblies mentioned in the first post.
 
 ![alt text](/images/at2/de4dot-1.png)
+_Figure 4_
 
 ![alt text](/images/at2/failure.png)
+_Figure 5_
 
 As shown above, de4dot as it comes by default is completely powerless against this perform of control flow flattening. No changes were made at all to the code. That means one thing: we are going to have to write something ourselves.
 
@@ -38,18 +43,19 @@ As shown above, de4dot as it comes by default is completely powerless against th
 We first need to analyze the flattening to find a consistent pattern to detect. In order to do that, we will need to look at a control flow graph of the IL code blocks directly. We will use my preferred tool IDA Pro to look at the control flow graph. There is a dnSpy plugin for generating a control flow graph, but I personally prefer how IDA's graph looks. We're going to start by navigating to the main function `8YpydOv4` in IDA.
 
 ![alt text](/images/at2/ida_graph.png)
+_Figure 6_
 
 Let's break down what is happening here. In the first block, the integer `0` is pushed onto the stack and then stored in the local variable index 0. Then, we have an unconditional jump to block `loc_FF` which then begins a series of checks on the dispatcher variable. When a check passes successfully, it executes the original code and then controls the flow by setting the variable to the next block to be executed. The number `5` here is the last check that is executed. We will refer to this final check as the `loop condition` because if this check fails, then it returns to the beginning of the loop. Otherwise, the function ends. It's also worth noting that case `0` does nothing except set the next case to `1`, i.e there is no actual code here being executed.
 
-Our goal here is to connect each block to the next one in the flow, bypassing the parts that set the dispatcher variable. If we can't find a matching block to one of the setters, we will simply assume it is the last block and connect it to the child block of the loop condition. Granted, this aforementioned case is not applicable to this particular function... 
-
-I feel like I should clarify the terminology I'm going to be using here. When I say 'setter' I mean groups of instructions like this which **set** the dispatcher variable:
+Our goal here is to connect each block to the next one in the flow, bypassing the parts that set the dispatcher variable. I feel like I should clarify the terminology I'm going to be using. When I say 'setter' I mean groups of instructions like this which **set** the dispatcher variable:
 
 ![alt text](/images/at2/setter.png)
+_Figure 7_
 
 When I refer to 'cases' I am talking about blocks like this which **check** the dispatcher variable:
 
 ![alt text](/images/at2/case.png)
+_Figure 8_
 
 Lastly, before I conclude this section I think it is important to manually unflatten the function in something like notepad just so we have an idea what kind of output to expect. This was a tip that was mentioned by Georgy Kucherin in his [presentation about unflattening DoubleZero](https://www.virusbulletin.com/uploads/pdf/conference/vb2022/papers/VB2022-Combating-control-flow-flattening-in-NET-malware.pdf) (which was way more complex and is totally worth a read!) and I found it to be very helpful.
 
@@ -70,6 +76,7 @@ The first thing we will do is clone the [de4dot repo](https://github.com/de4dot/
 Let's open it in Visual Studio. The first step is to create the obfuscator by doing the following steps. First, creating a new folder in this directory:
 
 ![alt text](/images/at2/project_layout_1.png)
+_Figure 9_
 
 Every deobfuscator in de4dot needs to have a `DeobfuscatorInfo` class. Here is what yours should look like:
 
@@ -172,10 +179,12 @@ It returns a list of `IBlocksDeobfuscator`'s. Each `IBlocksDeobfuscator` then ev
 At this point, your project structure should look like this:
 
 ![alt text](/images/at2/project_layout_2.png)
+_Figure 10_
 
 We also need to add the deobfuscator to the `Program.cs` file in `de4dot.cui` so it shows up in the actual application when it's launched
 
 ![alt text](/images/at2/de4dot_cui.png)
+_Figure 11_
 
 Now, we are going to create a new class that implements the `IBlocksDeobfuscator` interface. I'm going to call it `Unflattener`.
 
@@ -233,6 +242,7 @@ public override IEnumerable<IBlocksDeobfuscator> BlocksDeobfuscators
 What we need to do is implement the `Deobfuscate()` method. This method is going to get called on each method in the target binary. That list that's being passed in is all the basic blocks of the method. We want to begin deobfuscation starting with the first block of each method.
 
 ![alt text](/images/at2/ida1.png)
+_Figure 12_
 
 Each method begins with `ldc.i4` and `stloc`. We can use that as a signature. However, I'm going to make new class called `UnflattenerHelper` to do the actual unflattening part, since I'd like to separate the logic.
 
@@ -272,7 +282,7 @@ public UnflattenerHelper(Block block)
     if (block.Instructions.Count < 2 
         || block.Instructions[0].OpCode.Code != Code.Ldc_I4 
         || block.Instructions[1].OpCode.Code != Code.Stloc)
-        return;
+    return;
 }
 ```
 
@@ -293,12 +303,12 @@ public UnflattenerHelper(Block block)
     if (block.Instructions.Count < 2 
         || block.Instructions[0].OpCode.Code != Code.Ldc_I4 
         || block.Instructions[1].OpCode.Code != Code.Stloc)
-        return;
+    return;
 
     _initialCase = (int)block.Instructions[0].Operand;
     _startBlock = block;
 
-	if (_startBlock.FallThrough == null
+    if (_startBlock.FallThrough == null
     	|| _startBlock.FallThrough.Sources == null
     	|| _startBlock.FallThrough.Sources.Count < 2)
     return;
@@ -377,6 +387,7 @@ int IsCaseStartBlock(Block block)
 Now, we will update our `ExploreControlFlow` to save all the `cases` and `setters` that we logged. To do, I've created two dictionaries that each store the dispatcher number and the matching case or setter block. Keep in mind that when we save the `case` we are **NOT** including the case block itself, but the block it connects/falls through to. 
 
 ![alt text](/images/at2/ida2.png)
+_Figure 13_
 
 ```csharp
 
@@ -420,11 +431,12 @@ void ExploreControlFlow(Block block)
 After we've extracted all the data we need, it's time to perform the unflattening procedure. We will make a function called `Unflatten` which returns a boolean. The reason it will return a boolean is because the way de4dot works is that it will continuously call the `Deobfuscate` function in the `IBlocksDeobfuscator` class we defined until it returns `false`. The reason for this is that de4dot has built-in optimizers which will remove dead code amongst other things. So, we return `true` because modifications were made. If there were no modifications made for any reason, we return false. If you want to see more, take a look at the class `BlocksCflowDeobfuscator.cs`:
 
 ![alt text](/images/at2/deobfuscate.png)
+_Figure 14_
 
 The first thing we do is connect the starting block to the first case block with an unconditional jump (SetNewFallThrough). Then, we loop through all the setters and check if there is a corresponding case block for the setter. If so, we connect the block. I've also implemented a function called `CleanBlock()` that will remove the leftover setter instructions from the block.
 
 ![alt text](/images/at2/ida3.png)
-
+_Figure 15_
 
 When we are done unflattening, we also clean the same instructions in the start block.
 
@@ -481,7 +493,7 @@ Now, we need to go back to our `Unflattener.cs` class and add the call to the `U
 public bool Deobfuscate(List<Block> methodBlocks) 
 {
     UnflattenerHelper unflattenerHelper = new UnflattenerHelper(methodBlocks[0]);
-	return unflattenerHelper.Unflatten();
+    return unflattenerHelper.Unflatten();
 }
 ```
 
@@ -498,10 +510,14 @@ Now it's time for the fun part. Let's launch de4dot with the following parameter
 Here are some pictures of the results:
 
 ![alt text](/images/at2/result1.png)
+_Figure 16_
 
 ![alt text](/images/at2/result2.png)
+_Figure 17_
 
 I hope you enjoyed this post. I hope in the future to gain more experience and work on more complex obfuscation schemes. The article below shows a much more difficult type of control flow obfuscation that necessitates a different approach. I would highly recommend reading it.
+
+Lastly, I would like to thank [Ch40zz](https://github.com/Ch40zz) for helping me understand some logic errors that I made.
 
 ## Further reading:
 
