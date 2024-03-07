@@ -71,7 +71,7 @@ public static void 8YpydOv4()
 
 ## Creating the de4dot plugin
 
-The first thing we will do is clone the [de4dot repo](https://github.com/de4dot/de4dot). I am personally using [this one here](https://github.com/ViRb3/de4dot-cex) because it already has support for ConfuserEx, but it doesn't matter which one you decide to use.
+The first thing we will do is clone the [de4dot repo](https://github.com/de4dot/de4dot). I am personally using [this one here](https://github.com/ViRb3/de4dot-cex) because it already has support for a commonly used obfuscator called ConfuserEx, but it doesn't matter which one you decide to use.
 
 Let's open it in Visual Studio. The first step is to create the obfuscator by doing the following steps. First, creating a new folder in this directory:
 
@@ -174,7 +174,7 @@ public override IEnumerable<IBlocksDeobfuscator> BlocksDeobfuscators
 }
 ```
 
-It returns a list of `IBlocksDeobfuscator`'s. Each `IBlocksDeobfuscator` then eventually called on the basic blocks every function. Right now the list is empty, but we will be adding our own `IBlocksDeobfuscator` next.
+It returns a list of `IBlocksDeobfuscator`'s. Each `IBlocksDeobfuscator` is then eventually called on the basic blocks of every function. Right now the list is empty, but we will be adding our own `IBlocksDeobfuscator` next.
 
 At this point, your project structure should look like this:
 
@@ -288,7 +288,7 @@ public UnflattenerHelper(Block block)
 
 This should filter out any problematic functions. 
 
-Next, we should go and save some of the variables we described in our plan. In de4dot, the `Fallthrough` member corresponds to either an unconditional jump or the false condition of an if statement. The `Targets` member corresponds to the `true` condition of an if statement. Finally, the `Sources` list contains any block that jumps to the block.
+Next, we should go and save some of the variables we described in our plan. In de4dot, the `Fallthrough` member of a `Block` corresponds to either an unconditional jump or the false condition of an if statement. The `Targets` member corresponds to the `true` condition of an if statement. Finally, the `Sources` list contains any block that jumps to the block.
 
 Using this knowledge, we will save the value of the first case that gets executed as well as create a global for the current block (start block). Finally, we will store the loop condition. To do this, we will first get the fallthrough block of the start block. We will then extract the second item in the sources list since the first item will be the start block. I've added some checks to ensure that the start block exists in addition to making sure it has the expected count of sources.
 
@@ -319,7 +319,7 @@ public UnflattenerHelper(Block block)
 
 Now that we've done all this, it's time to explore the control flow graph and gather all the cases and setters. I will create a function `ExploreControlFlow()` which will iterate the entire control flow graph by checking each block's `Fallthrough` and `Target` members and recursing through them.
 
-Something very important here is the fact that I am keeping track of the visited blocks. Why? Well what happens if the method contains a loop? If we don't filter blocks we've visited before, our code will enter an infinite recursion and cause a stack overflow.
+Something very important here is the fact that I am keeping track of the visited blocks. Why? Well what happens if the method we are analyzing contains a loop? If we don't filter blocks we've visited before, our code will enter an infinite recursion when we're exploring the blocks and ultimately cause a stack overflow.
 
 ```csharp
 HashSet<Block> visitedBlocks = new HashSet<Block>();
@@ -428,7 +428,7 @@ void ExploreControlFlow(Block block)
 }
 ```
 
-After we've extracted all the data we need, it's time to perform the unflattening procedure. We will make a function called `Unflatten` which returns a boolean. The reason it will return a boolean is because the way de4dot works is that it will continuously call the `Deobfuscate` function in the `IBlocksDeobfuscator` class we defined until it returns `false`. The reason for this is that de4dot has built-in optimizers which will remove dead code amongst other things. So, we return `true` because modifications were made. If there were no modifications made for any reason, we return false. If you want to see more, take a look at the class `BlocksCflowDeobfuscator.cs`:
+After we've extracted all the data we need, it's time to perform the unflattening procedure. We will make a function called `Unflatten` which returns a boolean. The reason it will return a boolean is because the way de4dot works is that it will continuously call the `Deobfuscate` function in the `IBlocksDeobfuscator` class we defined until it returns `false`. Why? Well, de4dot has built-in optimizers which will remove dead code amongst other things. So, we return `true` because modifications were made. If there were no modifications made for any reason, we return false. If you want to see more, take a look at the class `BlocksCflowDeobfuscator.cs`:
 
 ![alt text](/images/at2/deobfuscate.png)
 _Figure 14_
@@ -515,7 +515,7 @@ _Figure 16_
 ![alt text](/images/at2/result2.png)
 _Figure 17_
 
-I hope you enjoyed this post. I hope in the future to gain more experience and work on more complex obfuscation schemes. The article below shows a much more difficult type of control flow obfuscation that necessitates a different approach. I would highly recommend reading it.
+I hope you enjoyed this post. My goal in the future is to gain more experience and work on more complex obfuscation schemes. The article below shows a much more difficult type of control flow obfuscation that necessitates a different approach. I would highly recommend reading it.
 
 Lastly, I would like to thank [Ch40zz](https://github.com/Ch40zz) for helping me understand some logic errors that I made.
 
