@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Agent Tesla [Part 1: Unpacking]"
+title:  "Agent Tesla Analysis [Part 1: Unpacking]"
 date:   2024-02-27 16:46:24 +0200
 categories: malware
 ---
@@ -8,6 +8,8 @@ categories: malware
 ## Introduction
 
 Agent Tesla is a popular info stealer coded in C# that consistently makes lists as one of the most prevalent malware strains. In this post we will be looking at a sample of Agent Tesla that has been packed by a very popular crypter. I am currently not aware of the name of the particular crypter responsible, but the amount of samples I am seeing daily being packed by it is insane. Despite this, I've only found 3 other articles documenting this crypter ([here](https://avsw.ru/component/content/article/analiz-semejstva-troyanov-agent-tesla?catid=9:avsoft-blog&Itemid=140), [here](https://infosecwriteups.com/unfolding-remcos-rat-4-9-2-pro-dfb3cb25bbd1) and [here](https://osamaellahi.medium.com/unfolding-agent-tesla-the-art-of-credentials-harvesting-f1a988cfd137)), but they are not very detailed, especially in explaining how to unpack the malware. The goal of this post is to explain how to unpack the final payload, starting from the beginning.
+
+**UPDATE 04/02/2024**: Checkpoint Research has [posted an article](https://research.checkpoint.com/2024/agent-tesla-targeting-united-states-and-australia/) which identifies the packer used to protect these samples as Cassandra Protector.
 
 ## First Stage
 

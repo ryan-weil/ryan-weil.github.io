@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Agent Tesla [Part 2: Deobfuscation]"
+title:  "Agent Tesla Analysis [Part 2: Deobfuscation]"
 date:   2024-03-01 16:46:24 +0200
 categories: malware
 ---
