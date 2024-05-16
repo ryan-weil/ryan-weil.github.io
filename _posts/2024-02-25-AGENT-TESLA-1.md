@@ -275,16 +275,14 @@ Opening the dumped file in dnSpy confirms that it is indeed Agent Tesla
 ![alt text](/images/at1/image-56.png)
 _Figure 53_
 
-Stay tuned for part two where we will be removing Agent Tesla's control flow flattening by writing our own de4dot plugin!
+I recommend [checking out my next post](https://ryan-weil.github.io/posts/AGENT-TESLA-2/) where I demonstrate how to remove Agent Tesla's control flow flattening by writing a de4dot plugin! 
 
-## IOC MD5's
+## IOCs
 
-Initial File/Stage One: B89F6062D174E452D189EC4248AF489C
-
-DeclareTextBoxValue.dll: 08ed70a40aa366a9d6e21cba736f4435
-
-ReactionDiffusion.dll: 440bb4db146ccb1161ac2bcf365d7676
-
-Tyrone.dll: a2f3cd39918ea671f5c983eccfd004d2
-
-Agent Tesla: 624b552d1e7457a345f89b6aa1d6c75b
+| File    | MD5 |
+| -------- | ------- |
+| Initial File/Stage One  | B89F6062D174E452D189EC4248AF489C  |
+| DeclareTextBoxValue.dll | 08ed70a40aa366a9d6e21cba736f4435  |
+| ReactionDiffusion.dll   | 440bb4db146ccb1161ac2bcf365d7676  |
+| Tyrone.dll              | a2f3cd39918ea671f5c983eccfd004d2  |
+| Agent Tesla Payload     | 624b552d1e7457a345f89b6aa1d6c75b  |

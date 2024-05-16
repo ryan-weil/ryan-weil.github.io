@@ -7,7 +7,7 @@ categories: malware
 
 ## Introduction
 
-In the [previous post](https://ryan-weil.github.io/posts/AGENT-TESLA-1/), we successfully unpacked Agent Tesla. We left off on a bit of a cliffhanger though, because after opening it in dnSpy it was apparent that it had control flow flattening applied. At first glance it doesn't look too unreadable:
+In the [previous post](https://ryan-weil.github.io/posts/AGENT-TESLA-1/) we successfully unpacked Agent Tesla. We left off on a bit of a cliffhanger though, because after opening it in dnSpy it was apparent that it had control flow flattening applied. At first glance it doesn't look too unreadable:
 
 ![alt text](/images/at2/first.png)
 _Figure 1_
