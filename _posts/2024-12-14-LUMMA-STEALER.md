@@ -15,7 +15,7 @@ Upon opening the `WinMain()` function in IDA, we can immediately see that contro
 
 ![alt text](/images/lumma/winmain.png)
 
-All that is required to solve this function is more or less what I did in my old [Agent Tesla post](/posts/AGENT-TESLA-2/), which is to find which blocks correspond to the mapping numbers and patch the flattened blocks to jump to their proper destinations. Here, we either have `jz` or `jnz` instructions which check the dispatcher variable (`eax` register) value. If it matches and the opcode is `jz`, the **jump** is taken. Otherwise, if it's `jnz` the **fallthrough** branch is taken. This is how it looks it would look in it's unflattened form:
+All that is required to solve this function is more or less what I did in my old [Agent Tesla post](/posts/AGENT-TESLA-2/), which is to find which blocks correspond to the mapping numbers and patch the flattened blocks to jump to their proper destinations. Here, we either have `jz` or `jnz` instructions which check the dispatcher variable (`eax` register) value. If it matches and the opcode is `jz`, the **jump** is taken. Otherwise, if it's `jnz` the **fallthrough** branch is taken. This is how it would look in it's unflattened form:
 
 ```cpp
 int __stdcall __noreturn WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
