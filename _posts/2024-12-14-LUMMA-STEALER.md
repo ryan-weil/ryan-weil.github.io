@@ -7,7 +7,7 @@ categories: malware
 
 ## Introduction
 
-Lumma Stealer is an infostealer that has been around for several years now, and consistently tops statistics on sites like MalwareBazaar as one of the most commonly distributed malware families. When it first released, Lumma Stealer had little to no obfuscation at all. Eventually, it incorporated things like [control flow flattening](https://www.esentire.com/blog/the-case-of-lummac2-v4-0), opaque predicates and more recently around the beginning of 2024 began using [control flow indirection](https://cloud.google.com/blog/topics/threat-intelligence/lummac2-obfuscation-through-indirect-control-flow). I set about developing a Hex-Rays plugin  to deobfuscate the sample from the first link prior to the news about control flow indirection being added. However, this methodology should still be applicable to the newer version **as long as the control flow indirection is removed first**. In this writeup, I will go through the different challenges I experienced during this project and how I overcame them.
+Lumma Stealer is an infostealer that has been around for several years now, and consistently tops statistics on sites like MalwareBazaar as one of the most commonly distributed malware families. When it first released, Lumma Stealer had little to no obfuscation at all. Eventually, it incorporated things like [control flow flattening](https://www.esentire.com/blog/the-case-of-lummac2-v4-0), opaque predicates and more recently around the beginning of 2024 began using [control flow indirection](https://cloud.google.com/blog/topics/threat-intelligence/lummac2-obfuscation-through-indirect-control-flow). I set about developing a Hex-Rays plugin to deobfuscate the sample from the first link prior to the news about control flow indirection being added. However, this methodology should still be applicable to the newer version **as long as the control flow indirection is removed first**. In this writeup, I will go through the different challenges I experienced during this project and how I overcame them.
 
 ## Initial Analysis of the Obfuscation
 
@@ -226,7 +226,7 @@ According to Rolf, the reason for this was
 
 > When you register a block optimizer and check for MMAT_LOCOPT, you're not getting called exactly at MMAT_LOCOPT, you're getting called somewhere afterwards, between then and the next maturity level MMAT_CALLS. and you might get called more than once, so you might get called in the middle of this analysis that is transforming the stx and ldx into mov instructions.
 
-That the microcode explorer and the code, despite being written to dump at the same stage, did not actually do so. The microcode explorer dump was at a slightly earlier stage of `MMAT_LOCOPT` that I was unable to operate at, hence why the code on the left has forwarded-propagated the `mov` in the first block (but not the second). After this incident, I mostly used microcode explorer strictly for initial analysis and relied on the dumps from the block optimizer callback for debugging.
+This means that the microcode explorer and the code, despite being written to dump at the same stage, did not actually do so. The microcode explorer dump was at a slightly earlier stage of `MMAT_LOCOPT` that I was unable to operate at, hence why the code on the left has forwarded-propagated the `mov` in the first block (but not the second). After this incident, I mostly used microcode explorer strictly for initial analysis and relied on the dumps from the block optimizer callback for debugging.
 
 The good news was that the idea worked. After trying again to decompile with the plugin enabled, all of the `ldx`/`stx` instructions were fixed and the dispatcher variable was found. There was another issue, however, and this one turned out to the most difficult and time-consuming for me to fix. I will use separate smaller function which has the same problem to explain.
 
@@ -325,7 +325,7 @@ mov    eax.4, %var_10.4        ; 420F08 u=eax.4      d=sp+E0.4
 goto   @2                      ; 420F0B u=
 ```
 
-Take a look at the `after` dump and you can see that the `optimization block` issue has been solved. Block `#27` now points to a copy of the `optimization block` that has no other incoming blocks, so it would be safe to patch the `goto @2` instruction to its correct location later on. Even more, after all dispatcher predecessors have been confirmed to have no more than two predecessors, we can handle the complex branches. To do so, I again iterate the dispatcher predecessors. This time, I create a 'trace' for each predecessor. The way I implemented tracing was to do a depth-first search from the dispatcher predecessor all the way up to the clusterhead. This will find every possible path to the clusterhead. I determine if we've hit the clusterhead by checking if its one of those `jz/jnz` comparison blocks from the beginning of our analysis. If so, the trace returns.
+Take a look at the `after` dump and you can see that the `optimization block` issue has been solved. Block `#27` now points to a copy of the `optimization block` that has no other incoming blocks, so it would be safe to patch the `goto @2` instruction to its correct location later on. After all dispatcher predecessors have been confirmed to have no more than two predecessors, we can handle the complex branches. To do so, I again iterate the dispatcher predecessors. This time, I create a 'trace' for each predecessor. The way I implemented tracing was to do a depth-first search from the dispatcher predecessor all the way up to the clusterhead. This will find every possible path to the clusterhead. I determine if we've hit the clusterhead by checking if its one of those `jz/jnz` comparison blocks from the beginning of our analysis. If so, the trace returns.
 
 Once this is done, I call another function which takes the trace information and turns it into a basic integer array of all the possible paths we found using the blocks' serials.
 
@@ -476,7 +476,11 @@ And what is the end result?
 
 ![alt text](/images/lumma/unflattened_final.gif)
 
-Fully deobfuscated code! Our largest function in the binary went from over 3000 lines to 429.
+Fully deobfuscated code! Our largest function in the binary went from **over 3000** lines of code to 429.
+
+The great thing about the deobfuscator is that since it works on subsequent versions (until they added control flow indirection), we can easily track the evolution of the malware. For example, the same large function is actually even larger in [a different Lumma binary I found](https://spycloud.com/blog/reversing-lummac2/) at **over 5000 lines of code**. In this version, the developers added string encryption as well as implemented the option to choose between two possible execution methods: `LoadLibraryW` and `rundll32` for DLLs. This feature is missing in the previous version as seen below:
+
+![alt text](/images/lumma/mw_main_routine_comparison.gif)
 
 ## Journey's End
 
@@ -491,3 +495,5 @@ The next addition to this project would probably be a microcode emulator. Lumma 
 Another feature I'd be interested in implementing is a profile system, maybe similar to what D-810 has although I have not looked at it in detail. All in all, there are endless possibilities for this project and it will surely come in use for analyzing obfuscated samples in the future. I hope you enjoyed reading this writeup as much as I did writing it, and I can't wait to publish more in the future!
 
 Lumma Stealer Sample SHA256: [00F1A9C6185B346F8FDF03E7928FACFC44FC63E6A847EB21FA0ECD7FB94BB7E3](https://www.virustotal.com/gui/file/00f1a9c6185b346f8fdf03e7928facfc44fc63e6a847eb21fa0ecd7fb94bb7e3)
+
+Lumma Stealer Sample #2 SHA256: [ECABBEAE6218B373F2D3A473D9F6ADD4BA5482EA3B97851C931197FB8993F8EF](https://www.virustotal.com/gui/file/ecabbeae6218b373f2d3a473d9f6add4ba5482ea3b97851c931197fb8993f8ef)
