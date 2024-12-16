@@ -327,7 +327,7 @@ goto   @2                      ; 420F0B u=
 
 Take a look at the `after` dump and you can see that the `optimization block` issue has been solved. Block `#27` now points to a copy of the `optimization block` that has no other incoming blocks, so it would be safe to patch the `goto @2` instruction to its correct location later on. Even more, after all dispatcher predecessors have been confirmed to have no more than two predecessors, we can handle the complex branches. To do so, I again iterate the dispatcher predecessors. This time, I create a 'trace' for each predecessor. The way I implemented tracing was to do a depth-first search from the dispatcher predecessor all the way up to the clusterhead. This will find every possible path to the clusterhead. I determine if we've hit the clusterhead by checking if its one of those `jz/jnz` comparison blocks from the beginning of our analysis. If so, the trace returns.
 
-Once this is done, I call another function which takes the trace information and turns it into a basic integer an array of all the possible paths we found using the blocks' serials.
+Once this is done, I call another function which takes the trace information and turns it into a basic integer array of all the possible paths we found using the blocks' serials.
 
 ```
 255 84 82 81
@@ -391,7 +391,7 @@ Take a look at this function:
 
 The variable `v3` is the variable which controls the control flow. However, a variable `v2` is being set at the beginning depending if the argument `arg_api_hash` is empty. `v2` is not being used until later on, when `v3` takes its value. I had never seen any other control flow unflattening writeup that ran into such an issue, and I came up with my own solution. Here is my idea:
 
-1) Identify the two possible conditions and the register (or stack variable in some cases) that the constants are moved in to (in this case EDI):
+1) Identify the two possible conditions and the register (or stack variable in some cases) that the constants are moved into (in this case EDI):
 
 ![alt text](/images/lumma/conditional_start_2.png)
 
@@ -403,7 +403,7 @@ The variable `v3` is the variable which controls the control flow. However, a va
 
 ![alt text](/images/lumma/conditional_start_4.png)
 
-When we find an assignment to ebx (the variable the dispatcher uses) from the variable that was saved at the beginning when we noticed there was a conditional start (edi), we change the affected block to a branch by making a it a jz. This jz will check if edi is 0 or not (remember we switched the mov instructions at the beginning to move 1 or 0 instant of the block assignment number?)
+When we find an assignment to `ebx` (the variable the dispatcher uses) from the variable that was saved at the beginning when we noticed there was a conditional start (`edi`), we change the affected block to a branch by making it a `jz`. This `jz` will check if edi is 0 or not (remember we switched the mov instructions at the beginning to move 1 or 0 instead of the block assignment number?)
 
 Then, it will jump to whichever case is bound to 0 or 1. Here is how it looks after:
 
@@ -439,7 +439,7 @@ The end result will be a completely unflattened graph, right? I revisited the ma
 
 ### Opaque Predicates / Junk Code
 
-I ran into several issues trying to remove the opaque predicates. Firstly, legitimate instructions get interwoven with the opaque predicates / junk code. Based off of the few functions I had looked at when I originally tried to remove them, it sufficed to simply erase the entire effected block by filling it with nops. I later found out the consequences of doing this, so I had to change my strategy.
+I ran into several issues trying to remove the opaque predicates. Firstly, legitimate instructions get interwoven with the opaque predicates / junk code. Based off of the few functions I had looked at when I originally tried to remove them, it sufficed to simply erase the entire affected block by filling it with nops. I later found out the consequences of doing this, so I had to change my strategy.
 
 ```
 44. 0 xdu    [ds.2:(%var_B4.4{85}+#3.4)].1, %var_4C.4{68} ; 4332CA u=ds.2,sp+18.4,(GLBLOW,GLBHIGH) d=sp+80.4  <-------------------legit instruction thats getting removed!
@@ -448,7 +448,7 @@ I ran into several issues trying to remove the opaque predicates. Firstly, legit
 44. 3 jnz    eax.4{72}, ((#0x139F.4*eax.4{72})-#1.4), @67 ; 43335D inverted_jx u=eax.4
 ``` 
 
-The above is a screenshot from `MMAT_CALLS` showing how legitimate instruction can appear in blocks that have junk instructions. You may be wondering why I'm suddenly at `MMAT_CALLS` after spending the entiriety of this project working at `MMAT_LOCOPT`. Well, I was originally trying to remove the opaques/junk at `MMAT_LOCOPT` and was running some issues. See how the each instruction, despite containg a ton of operations only is technically one line? During `MMAT_LOCOPT`, Hex-Rays had not performed any optimizations on the instructions and I was getting all sorts of different instruction patterns which broke my signature.
+The above is a screenshot from `MMAT_CALLS` showing how legitimate instruction can appear in blocks that have junk instructions. You may be wondering why I'm suddenly at `MMAT_CALLS` after spending the entirety of this project working at `MMAT_LOCOPT`. Well, I was originally trying to remove the opaques/junk at `MMAT_LOCOPT` and was running some issues. See how each instruction, despite containing a ton of operations only is technically one line? During `MMAT_LOCOPT`, Hex-Rays had not performed any optimizations on the instructions and I was getting all sorts of different instruction patterns which broke my signature.
 
 ```
 226. 0 ; 2WAY-BLOCK 226 INBOUNDS: 131 OUTBOUNDS: 227 228 [START=43332C END=43335F] MINREFS: STK=0/ARG=D0, MAXBSP: 8
@@ -468,9 +468,9 @@ The above is a screenshot from `MMAT_CALLS` showing how legitimate instruction c
 226. 9
 ```
 
-I decided was keep everything related to the unflattening in `MMAT_LOCOPT`, and wait till `MMAT_CALLS` to begin the opaque predicate removal. Thus, my plugin operates at two separate microcode maturities. While at the `MMAT_CALLS` stage, I was able to create a working signature to detect and find opaque predicate blocks.
+I decided to keep everything related to the unflattening in `MMAT_LOCOPT`, and wait until `MMAT_CALLS` to begin the opaque predicate removal. Thus, my plugin operates at two separate microcode maturities. While at the `MMAT_CALLS` stage, I was able to create a working signature to detect and find opaque predicate blocks.
 
-The way this worked was to look for conditional blocks which multipled by a `16` bit constant and then subtracted the constant `1`. I store all stack variables that were accessed by these blocks and kept track of their count every time another block was detected. I patch each opaque predicate to remove its fake branch depending if it was `jz` or `jnz`. Then, I used the most common stack variable stored from earlier to find other leftover junk instructions that got interwoven with other blocks and remove them.
+The way this worked was to look for conditional blocks which multipled by a `16` bit constant and then subtracted the constant `1`. I store all stack variables that were accessed by these blocks and kept track of their count every time another block was detected. I patch each opaque predicate to remove its fake branch depending on if it was `jz` or `jnz`. Then, I used the most common stack variable stored from earlier to find other leftover junk instructions that got interwoven with other blocks and remove them.
 
 And what is the end result?
 
@@ -480,7 +480,7 @@ Fully deobfuscated code! Our largest function in the binary went from over 3000 
 
 ## Journey's End
 
-In the end, I ended up deobfuscating probably around 50 opaque'd and flattened functions. This project was one the hardest yet most rewarding I've ever done. There were many times I felt like I was trying to do something that couldn't be accomplished, but I was relentless and would not give up. **I have to give a huge thanks to Rolf Rolles for not only creating the original plugin project that this was based off of, but also being kind enough to answer my questions about Hex-Rays internals. Without his incredible knowledge of the microcode API, I don't know if I'd ever have been able to finish this project.**
+In the end, I ended up deobfuscating probably around 50 opaque'd and flattened functions. This project was one of the hardest yet most rewarding I've ever done. There were many times I felt like I was trying to do something that couldn't be accomplished, but I was relentless and would not give up. **I have to give a huge thanks to Rolf Rolles for not only creating the original plugin project that this was based off of, but also being kind enough to answer my questions about Hex-Rays internals. Without his incredible knowledge of the microcode API, I don't know if I'd ever have been able to finish this project.**
 
 The next addition to this project would probably be a microcode emulator. Lumma Stealer didn't require one, but there are other malware families like Emotet which after a brief glance at one of its binaries seems to not simply move a pre-determined numeric value between registers, but calculates it using different operations:
 
