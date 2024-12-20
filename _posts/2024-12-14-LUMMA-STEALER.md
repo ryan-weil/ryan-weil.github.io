@@ -57,7 +57,7 @@ I had never worked with the Hex-Rays API at all before this, but I was aware of 
 
 During the development of the plugin, I didn't necessarily go in the exact order as described below. I tried removing the opaque predicates before completely finishing the unflattening removal, which turned out to be a mistake. I also bounced around many functions, sometimes not finishing one before I began another and going back. However, to make the flow of this writeup easier to follow I will describe the process of the flattening removal function-by-function and then move on to the opaque predicates.
 
-The way the original plugin begins is to get all the flattened blocks by finding the most frequent occurence of a comparison between a certain register or stack variable, which will be referred to as the `dispatcher variable`. It then detects `mov` instructions that move a numeric value into that variable, and patches those at the end to be jumps to the corresponding comparison block's child block. Unmodified, it only searched for comparisons using the `jz` opcode. The first change I made to the plugin was about as easy as it gets: I added handling for the `jnz` cases as well. This change resulted in the unflattening of the `WinMain()` function.
+The original plugin works by finding the most frequent occurence of a comparison between a certain register or stack variable, which will be referred to as the `dispatcher variable`. Each of these `comparison block`s' numeric value that is being compared is then saved into a map with its corresponding child block. Next, the code detects `mov` instructions that move a numeric value into that variable, and patches those at the end to be jumps to the corresponding comparison block's child block. Unmodified, it only searched for comparisons using the `jz` opcode. The first change I made to the plugin was about as easy as it gets: I added handling for the `jnz` cases as well. This change resulted in the unflattening of the `WinMain()` function.
 
 ```cpp
 int visit_minsn(void)
@@ -127,7 +127,7 @@ Additionally, when I tried to decompile the function with my plugin enabled it f
 
 ![alt text](/images/lumma/mw_main_routine_1.png)
 
-Looking at the first block of the function, we can see that the stack base `ebp` is being moved into the register `esi`. Then, a variable at `base of stack + 4` is being written to. The difference is, in our previous functions, `ebp` was used directly. Here it is not. I assumed this wouldn't be a problem because Hex-Rays optimization should recognize that `esi+ 4` is a stack variable. This turned out to be incorrect. Rolf's original project includes a microcode explorer (like the unflattening plugin, the first of its kind) which can be used to view the microcode as a graph. I opened the microcode explorer and browsed the microcode maturity level I was operating at, `MMAT_LOCOPT`.
+Looking at the first block of the function, we can see that the stack base `ebp` is being moved into the register `esi`. Then, a variable at `base of stack + 4` is being written to. The difference is, in our previous functions, `ebp` was used directly. Here it is not. I assumed this wouldn't be a problem because Hex-Rays optimization should recognize that `esi + 4` is a stack variable. This turned out to be incorrect. Rolf's original project includes a microcode explorer (like the unflattening plugin, the first of its kind) which can be used to view the microcode as a graph. I opened the microcode explorer and browsed the microcode maturity level I was operating at, `MMAT_LOCOPT`.
 
 That is when the issue started to become a bit more clear:
 
@@ -486,13 +486,7 @@ The great thing about the deobfuscator is that since it works on subsequent vers
 
 In the end, I ended up deobfuscating probably around 50 opaque'd and flattened functions. This project was one of the hardest yet most rewarding I've ever done. There were many times I felt like I was trying to do something that couldn't be accomplished, but I was relentless and would not give up. **I have to give a huge thanks to Rolf Rolles for not only creating the original plugin project that this was based off of, but also being kind enough to answer my questions about Hex-Rays internals. Without his incredible knowledge of the microcode API, I don't know if I'd ever have been able to finish this project.**
 
-The next addition to this project would probably be a microcode emulator. Lumma Stealer didn't require one, but there are other malware families like Emotet which after a brief glance at one of its binaries seems to not simply move a pre-determined numeric value between registers, but calculates it using different operations:
-
-![alt text](/images/lumma/emotet_1.png)
-
-![alt text](/images/lumma/emotet_2.png)
-
-Another feature I'd be interested in implementing is a profile system, maybe similar to what D-810 has although I have not looked at it in detail. All in all, there are endless possibilities for this project and it will surely come in use for analyzing obfuscated samples in the future. I hope you enjoyed reading this writeup as much as I did writing it, and I can't wait to publish more in the future!
+The next addition to this project would probably be a microcode emulator. Lumma Stealer didn't require one, but there are other malware families which likely would. Another feature I'd be interested in implementing is a profile system, maybe similar to what D-810 has although I have not looked at it in detail. All in all, there are endless possibilities for this project and it will surely come in use for analyzing obfuscated samples in the future. I hope you enjoyed reading this writeup as much as I did writing it, and I can't wait to publish more in the future!
 
 Lumma Stealer Sample SHA256: [00F1A9C6185B346F8FDF03E7928FACFC44FC63E6A847EB21FA0ECD7FB94BB7E3](https://www.virustotal.com/gui/file/00f1a9c6185b346f8fdf03e7928facfc44fc63e6a847eb21fa0ecd7fb94bb7e3)
 
